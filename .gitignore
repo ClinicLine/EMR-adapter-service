@@ -1,0 +1,29 @@
+# Python virtual environment
+venv/
+
+# Local environment variables
+.env
+.env.example
+
+# pytest cache
+.pytest_cache/
+
+# Editable install metadata
+*.egg-info/
+
+# Bytecode / caches
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# other
+accuro_adapter/get_patient.py
+notes/
