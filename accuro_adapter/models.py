@@ -13,3 +13,4 @@ class AppointmentBasic(BaseModel):
     start: str | None = None  # ISO-8601 dateTime
     end: str | None = None
     status: str | None = None
+  
