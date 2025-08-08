@@ -11,6 +11,7 @@ from .models import PatientBasic, AppointmentBasic
 load_dotenv()
 
 _BASE_URL = os.getenv("ACCURO_BASE_URL", "https://sandbox.accuroemr.com/api")
+_OFFLINE = os.getenv("OFFLINE_MODE", "0") == "1"
 _TOKEN_URL = os.getenv("ACCURO_TOKEN_URL", f"{_BASE_URL}/oauth2/token")
 _CLIENT_ID = os.getenv("ACCURO_CLIENT_ID")
 _CLIENT_SECRET = os.getenv("ACCURO_CLIENT_SECRET")
@@ -18,7 +19,10 @@ _CLIENT_SECRET = os.getenv("ACCURO_CLIENT_SECRET")
 _TOKEN_CACHE: dict[str, float | str] = {"token": None, "exp": 0.0}
 
 async def _get_token() -> str:
-    """Fetch and cache bearer token for ~55 minutes."""
+    """Fetch and cache bearer token for ~55 minutes.
+    When OFFLINE_MODE=1 return a dummy token and skip HTTP call."""
+    if _OFFLINE:
+        return "offline-token"
     now = time.time()
     if _TOKEN_CACHE["token"] and now < _TOKEN_CACHE["exp"]:
         return _TOKEN_CACHE["token"]  # type: ignore
@@ -72,7 +76,10 @@ async def fetch_appointment(appt_id: str) -> AppointmentBasic:
     )
 
 async def cancel_appointment(appt_id: str) -> None:
-    """Mark an appointment as cancelled. Accuro sandbox may require PATCH operation."""
+    """Mark an appointment as cancelled.
+    In OFFLINE_MODE just return successfully."""
+    if _OFFLINE:
+        return
     headers = {"Authorization": f"Bearer {await _get_token()}", "Content-Type": "application/json-patch+json"}
     patch_body = [{"op": "replace", "path": "/status", "value": "cancelled"}]
     async with httpx.AsyncClient(http2=True, timeout=15) as client:
@@ -80,7 +87,16 @@ async def cancel_appointment(appt_id: str) -> None:
         resp.raise_for_status()
 
 async def find_appointment(patient_id: str, date_iso: str) -> AppointmentBasic | None:
-    """Return the first appointment for a patient on a given date (YYYY-MM-DD) or None."""
+    """Return the first appointment for a patient on a given date (YYYY-MM-DD) or None.
+    In OFFLINE_MODE fabricate a fake appointment so flow can continue."""
+    if _OFFLINE:
+        return AppointmentBasic(
+            id="demo-appt",
+            patient_id=patient_id,
+            start=f"{date_iso}T09:00:00",
+            end=f"{date_iso}T09:15:00",
+            status="booked",
+        )
     headers = {"Authorization": f"Bearer {await _get_token()}", "Accept": "application/json"}
     params = {"patient": patient_id, "date": date_iso}
     async with httpx.AsyncClient(http2=True, timeout=15) as client:

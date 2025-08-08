@@ -19,7 +19,7 @@ COPY . /app
 # Install python deps in editable mode (includes accuro_adapter)
 RUN pip install --upgrade pip && \
     pip install -e . && \
-    pip install fastapi uvicorn[standard] python-dotenv httpx
+    pip install fastapi uvicorn[standard] python-dotenv "httpx[http2]"
 
 # Expose the default uvicorn port
 EXPOSE 8000
