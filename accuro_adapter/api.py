@@ -1,13 +1,20 @@
 import os
 from fastapi import FastAPI, HTTPException, Depends, Header, Query, Body
 from typing import Optional, Union
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from .client import find_appointment, cancel_appointment, fetch_patient_basic
+
+class SearchResp(BaseModel):
+    patient_id: str
 
 class CancelRequest(BaseModel):
     tenant: str = "default"  
     patient_id: Union[str, int]
-    date: str  # YYYY-MM-DD
+    date: str = Field(alias="appt_date")  
+
+    model_config = {
+        "populate_by_name": True  
+    }
 
 RETELL_KEY = os.getenv("RETELL_WEBHOOK_KEY", "")
 
@@ -23,15 +30,20 @@ def verify_retell(authorization: str = Header(...)):
 async def cancel(
     req: Optional[CancelRequest] = Body(None),
     patient_id: Optional[str] = Query(None, description="Patient ID if not provided in JSON body"),
-    date: Optional[str] = Query(None, description="YYYY-MM-DD appointment date if not provided in body"),
+    appt_date: Optional[str] = Query(None, alias="appt_date", description="YYYY-MM-DD appointment date if not provided in body"),
     tenant: str = Query("default", description="Clinic tenant if not provided in body"),
 ):
     # Accept payload either from JSON body or from query parameters so testing tools can
-    # easily pass constants without constructing JSON.
+    # pass constants without constructing JSON.
     if req is None:
-        if not patient_id or not date:
-            raise HTTPException(status_code=422, detail="patient_id and date are required")
-        req = CancelRequest(tenant=tenant, patient_id=patient_id, date=date)
+        if not patient_id or not appt_date:
+            raise HTTPException(status_code=422, detail="patient_id and appt_date are required")
+        appt_date_q = appt_date
+        req = CancelRequest(tenant=tenant, patient_id=patient_id, date=appt_date_q)
+    # Short-circuit in OFFLINE_MODE – always succeed
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        return {"message": "cancelled", "appointment_id": "offline-demo"}
+
     appt = await find_appointment(str(req.patient_id), req.date)
     if not appt:
         raise HTTPException(status_code=404, detail="No appointment found")
@@ -40,7 +52,28 @@ async def cancel(
     await cancel_appointment(appt.id)
     return {"message": "cancelled", "appointment_id": appt.id}
 
-# ----------------------------- Read-only endpoints -----------------------------
+# Search patient endpoint
+
+@app.get("/patient/search", dependencies=[Depends(verify_retell)])
+async def patient_search(
+    given: Optional[str] = Query(None, alias="given"),
+    family: Optional[str] = Query(None, alias="family"),
+    first_name: Optional[str] = Query(None, alias="first_name"),
+    last_name: Optional[str] = Query(None, alias="last_name"),
+    dob: str = Query(...),
+):
+    """Return stub patient_id while OFFLINE."""
+    # Normalize names
+    given = given or first_name or "John"
+    family = family or last_name or "Doe"
+
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        # Ignore names; always return demo ID
+        return SearchResp(patient_id="123")
+
+    raise HTTPException(status_code=501, detail="Search not implemented in live mode yet")
+
+# Read-only endpoints 
 
 @app.get("/patient/{patient_id}", dependencies=[Depends(verify_retell)])
 async def get_patient(patient_id: str):
