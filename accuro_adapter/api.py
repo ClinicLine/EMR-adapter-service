@@ -56,16 +56,14 @@ async def cancel(
 
 @app.get("/patient/search", dependencies=[Depends(verify_retell)])
 async def patient_search(
-    given: Optional[str] = Query(None, alias="given"),
-    family: Optional[str] = Query(None, alias="family"),
     first_name: Optional[str] = Query(None, alias="first_name"),
     last_name: Optional[str] = Query(None, alias="last_name"),
     dob: str = Query(...),
 ):
     """Return stub patient_id while OFFLINE."""
     # Normalize names
-    given = given or first_name or "John"
-    family = family or last_name or "Doe"
+    first_name = first_name or "John"
+    last_name = last_name or "Doe"
 
     if os.getenv("OFFLINE_MODE", "0") == "1":
         # Ignore names; always return demo ID
