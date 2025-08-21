@@ -1,5 +1,6 @@
 import os
-from fastapi import FastAPI, HTTPException, Depends, Header, Query, Body
+from fastapi import FastAPI, HTTPException, Depends, Query, Body
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Union
 from pydantic import BaseModel, Field
 from .client import find_appointment, cancel_appointment, fetch_patient_basic
@@ -17,13 +18,14 @@ class CancelRequest(BaseModel):
     }
 
 RETELL_KEY = os.getenv("RETELL_WEBHOOK_KEY", "")
+# HTTPBearer scheme so Swagger-UI can attach the Authorization header globally
+auth_scheme = HTTPBearer(auto_error=False)
 
 app = FastAPI(title="Accuro Adapter Service")
 
-def verify_retell(authorization: str = Header(...)):
-    """Simple bearer-token check for Retell webhook"""
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or token != RETELL_KEY:
+def verify_retell(credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)):
+    """Validate Bearer token provided via Authorization header"""
+    if credentials is None or credentials.scheme.lower() != "bearer" or credentials.credentials != RETELL_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 @app.post("/cancel", dependencies=[Depends(verify_retell)])
