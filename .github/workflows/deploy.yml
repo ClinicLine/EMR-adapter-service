@@ -32,12 +32,17 @@ jobs:
         run: |
           IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+          # Tag images with both commit SHA and :latest
           docker tag $ECR_REPOSITORY:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+          # Ensure ECR repo exists then login
           aws ecr describe-repositories --repository-names $ECR_REPOSITORY --region $AWS_REGION || \
             aws ecr create-repository --repository-name $ECR_REPOSITORY --region $AWS_REGION
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          # Push both tags
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
           echo "IMAGE=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
 
       - name: Deploy updated image to ECS
