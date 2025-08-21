@@ -27,3 +27,4 @@ Thumbs.db
 # other
 accuro_adapter/get_patient.py
 notes/
+aws-test-app/

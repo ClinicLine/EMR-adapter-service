@@ -61,7 +61,6 @@ async def patient_search(
     dob: str = Query(...),
 ):
     """Return stub patient_id while OFFLINE."""
-    # Normalize names
     first_name = first_name or "John"
     last_name = last_name or "Doe"
 
