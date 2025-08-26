@@ -108,17 +108,17 @@ async def book_appt(
 
 @app.post("/reschedule", dependencies=[Depends(verify_retell)], response_model=RescheduleResponse)
 async def reschedule_appt(
-    body: Optional[RescheduleRequest] = Body(None),
+    body: Optional[dict] = Body(None),
     patient_id: Optional[str] = Query(None),
     old_time_q: Optional[str] = Query(None, alias="old_time"),
     new_start_q: Optional[str] = Query(None, alias="new_start"),
 ):
     """Reschedule an appointment (stub)."""
     # Merge sources – JSON body takes precedence if present
-    if body is not None:
-        patient_id = body.patient_id or patient_id
-        old_time = body.old_time or old_time_q
-        new_start = body.new_start or new_start_q
+    if body:
+        patient_id = body.get("patient_id", patient_id)
+        old_time = body.get("old_time", old_time_q)
+        new_start = body.get("new_start", new_start_q)
     else:
         old_time = old_time_q
         new_start = new_start_q
