@@ -81,7 +81,7 @@ async def patient_search(
 async def list_availability(patient_id: str = Query(...)):
     """Return up to three open slots for the patient. In OFFLINE_MODE generate demo data."""
     if os.getenv("OFFLINE_MODE", "0") == "1":
-        hour_choice = random.choice([9, 11, 13, 15])  # 9 a.m, 11 a.m, 1 p.m, 3 p.m
+        hour_choice = random.choice([9, 11, 13, 15])  
         base = datetime.utcnow().replace(hour=hour_choice, minute=0, second=0, microsecond=0)
         return [
             AvailabilitySlot(start=(base + timedelta(days=1)).isoformat(), end=(base + timedelta(days=1, minutes=15)).isoformat()),
@@ -96,8 +96,7 @@ async def book_appt(
     patient_id: Optional[str] = Query(None),
     start: Optional[str] = Query(None),
 ):
-    """Book an appointment (stub).
-    Accepts JSON body or simple query parameters so Retell can hit it without crafting JSON."""
+    """Book an appointment (stub)."""
     if req is None:
         if not patient_id or not start:
             raise HTTPException(status_code=422, detail="patient_id and start are required")
@@ -109,20 +108,26 @@ async def book_appt(
 
 @app.post("/reschedule", dependencies=[Depends(verify_retell)], response_model=RescheduleResponse)
 async def reschedule_appt(
-    req: Optional[RescheduleRequest] = Body(None),
+    body: Optional[RescheduleRequest] = Body(None),
     patient_id: Optional[str] = Query(None),
-    old_time: Optional[str] = Query(None, alias="old_time"),
-    new_start: Optional[str] = Query(None, alias="new_start"),
+    old_time_q: Optional[str] = Query(None, alias="old_time"),
+    new_start_q: Optional[str] = Query(None, alias="new_start"),
 ):
-    """Reschedule an appointment (stub).
-    Allows query params fallback like /book."""
-    if req is None:
-        if not patient_id or not old_time or not new_start:
-            raise HTTPException(status_code=422, detail="patient_id, old_time, new_start required")
-        req = RescheduleRequest(patient_id=patient_id, old_time=old_time, new_start=new_start)
+    """Reschedule an appointment (stub)."""
+    # Merge sources – JSON body takes precedence if present
+    if body is not None:
+        patient_id = body.patient_id or patient_id
+        old_time = body.old_time or old_time_q
+        new_start = body.new_start or new_start_q
+    else:
+        old_time = old_time_q
+        new_start = new_start_q
+
+    if not patient_id or not old_time or not new_start:
+        raise HTTPException(status_code=422, detail="patient_id, old_time, new_start required")
 
     if os.getenv("OFFLINE_MODE", "0") == "1":
-        return RescheduleResponse(new_time=req.new_start)
+        return RescheduleResponse(new_time=new_start)
     raise HTTPException(status_code=501, detail="Live reschedule not implemented")
 
 @app.post("/handoff", dependencies=[Depends(verify_retell)], status_code=204)
