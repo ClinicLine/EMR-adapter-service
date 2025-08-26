@@ -4,6 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Union
 from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
+import random
 from .models import AvailabilitySlot, BookRequest, BookResponse, RescheduleRequest, RescheduleResponse
 from .client import find_appointment, cancel_appointment, fetch_patient_basic
 
@@ -80,7 +81,8 @@ async def patient_search(
 async def list_availability(patient_id: str = Query(...)):
     """Return up to three open slots for the patient. In OFFLINE_MODE generate demo data."""
     if os.getenv("OFFLINE_MODE", "0") == "1":
-        base = datetime.utcnow().replace(hour=13, minute=0, second=0, microsecond=0)
+        hour_choice = random.choice([9, 11, 13, 15])  # 9 a.m, 11 a.m, 1 p.m, 3 p.m
+        base = datetime.utcnow().replace(hour=hour_choice, minute=0, second=0, microsecond=0)
         return [
             AvailabilitySlot(start=(base + timedelta(days=1)).isoformat(), end=(base + timedelta(days=1, minutes=15)).isoformat()),
             AvailabilitySlot(start=(base + timedelta(days=4)).isoformat(), end=(base + timedelta(days=4, minutes=15)).isoformat()),
