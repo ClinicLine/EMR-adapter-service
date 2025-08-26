@@ -81,13 +81,19 @@ async def patient_search(
 async def list_availability(patient_id: str = Query(...)):
     """Return up to three open slots for the patient. In OFFLINE_MODE generate demo data."""
     if os.getenv("OFFLINE_MODE", "0") == "1":
-        hour_choice = random.choice([9, 11, 13, 15])  
-        base = datetime.utcnow().replace(hour=hour_choice, minute=0, second=0, microsecond=0)
-        return [
-            AvailabilitySlot(start=(base + timedelta(days=1)).isoformat(), end=(base + timedelta(days=1, minutes=15)).isoformat()),
-            AvailabilitySlot(start=(base + timedelta(days=4)).isoformat(), end=(base + timedelta(days=4, minutes=15)).isoformat()),
-            AvailabilitySlot(start=(base + timedelta(days=7)).isoformat(), end=(base + timedelta(days=7, minutes=15)).isoformat()),
-        ]
+        hours = random.sample([9, 11, 13, 15], k=3)  # three unique hours
+        base_today = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        day_offsets = [1, 4, 7]
+        slots = []
+        for offset, hr in zip(day_offsets, hours):
+            start_dt = (base_today + timedelta(days=offset)).replace(hour=hr)
+            slots.append(
+                AvailabilitySlot(
+                    start=start_dt.isoformat(),
+                    end=(start_dt + timedelta(minutes=15)).isoformat(),
+                )
+            )
+        return slots
     raise HTTPException(status_code=501, detail="Live availability not implemented")
 
 @app.post("/book", dependencies=[Depends(verify_retell)], response_model=BookResponse)
