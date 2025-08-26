@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [ "**" ]
 
 permissions:
   id-token: write  # required for OIDC

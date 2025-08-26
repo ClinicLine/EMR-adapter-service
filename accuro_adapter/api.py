@@ -3,6 +3,8 @@ from fastapi import FastAPI, HTTPException, Depends, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Union
 from pydantic import BaseModel, Field
+from datetime import datetime, timedelta
+from .models import AvailabilitySlot, BookRequest, BookResponse, RescheduleRequest, RescheduleResponse
 from .client import find_appointment, cancel_appointment, fetch_patient_basic
 
 class SearchResp(BaseModel):
@@ -71,6 +73,39 @@ async def patient_search(
         return SearchResp(patient_id="123")
 
     raise HTTPException(status_code=501, detail="Search not implemented in live mode yet")
+
+# Booking related endpoints -------------------------------------------------
+
+@app.get("/availability", dependencies=[Depends(verify_retell)], response_model=list[AvailabilitySlot])
+async def list_availability(patient_id: str = Query(...)):
+    """Return up to three open slots for the patient. In OFFLINE_MODE generate demo data."""
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        base = datetime.utcnow().replace(hour=13, minute=0, second=0, microsecond=0)
+        return [
+            AvailabilitySlot(start=(base + timedelta(days=1)).isoformat(), end=(base + timedelta(days=1, minutes=15)).isoformat()),
+            AvailabilitySlot(start=(base + timedelta(days=4)).isoformat(), end=(base + timedelta(days=4, minutes=15)).isoformat()),
+            AvailabilitySlot(start=(base + timedelta(days=7)).isoformat(), end=(base + timedelta(days=7, minutes=15)).isoformat()),
+        ]
+    raise HTTPException(status_code=501, detail="Live availability not implemented")
+
+@app.post("/book", dependencies=[Depends(verify_retell)], response_model=BookResponse)
+async def book_appt(req: BookRequest):
+    """Book an appointment (stub)."""
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        return BookResponse(confirmation_code="demo-12345", appointment_time=req.start)
+    raise HTTPException(status_code=501, detail="Live booking not implemented")
+
+@app.post("/reschedule", dependencies=[Depends(verify_retell)], response_model=RescheduleResponse)
+async def reschedule_appt(req: RescheduleRequest):
+    """Reschedule an appointment (stub)."""
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        return RescheduleResponse(new_time=req.new_start)
+    raise HTTPException(status_code=501, detail="Live reschedule not implemented")
+
+@app.post("/handoff", dependencies=[Depends(verify_retell)], status_code=204)
+async def handoff():
+    """Notify backend of human handoff. In offline mode we just ACK."""
+    return None
 
 # Read-only endpoints 
 
