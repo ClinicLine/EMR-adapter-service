@@ -3,6 +3,9 @@ from fastapi import FastAPI, HTTPException, Depends, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Union
 from pydantic import BaseModel, Field
+from datetime import datetime, timedelta
+import random
+from .models import AvailabilitySlot, BookRequest, BookResponse, RescheduleRequest, RescheduleResponse
 from .client import find_appointment, cancel_appointment, fetch_patient_basic
 
 class SearchResp(BaseModel):
@@ -71,6 +74,72 @@ async def patient_search(
         return SearchResp(patient_id="123")
 
     raise HTTPException(status_code=501, detail="Search not implemented in live mode yet")
+
+# Booking related endpoints 
+
+@app.get("/availability", dependencies=[Depends(verify_retell)], response_model=list[AvailabilitySlot])
+async def list_availability(patient_id: str = Query(...)):
+    """Return up to three open slots for the patient. In OFFLINE_MODE generate demo data."""
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        hours = random.sample([9, 11, 13, 15], k=3)  # three unique hours
+        base_today = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        day_offsets = [1, 4, 7]
+        slots = []
+        for offset, hr in zip(day_offsets, hours):
+            start_dt = (base_today + timedelta(days=offset)).replace(hour=hr)
+            slots.append(
+                AvailabilitySlot(
+                    start=start_dt.isoformat(),
+                    end=(start_dt + timedelta(minutes=15)).isoformat(),
+                )
+            )
+        return slots
+    raise HTTPException(status_code=501, detail="Live availability not implemented")
+
+@app.post("/book", dependencies=[Depends(verify_retell)], response_model=BookResponse)
+async def book_appt(
+    req: Optional[BookRequest] = Body(None),
+    patient_id: Optional[str] = Query(None),
+    start: Optional[str] = Query(None),
+):
+    """Book an appointment (stub)."""
+    if req is None:
+        if not patient_id or not start:
+            raise HTTPException(status_code=422, detail="patient_id and start are required")
+        req = BookRequest(patient_id=patient_id, start=start)
+
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        return BookResponse(confirmation_code="demo-12345", appointment_time=req.start)
+    raise HTTPException(status_code=501, detail="Live booking not implemented")
+
+@app.post("/reschedule", dependencies=[Depends(verify_retell)], response_model=RescheduleResponse)
+async def reschedule_appt(
+    body: Optional[dict] = Body(None),
+    patient_id: Optional[str] = Query(None),
+    old_time_q: Optional[str] = Query(None, alias="old_time"),
+    new_start_q: Optional[str] = Query(None, alias="new_start"),
+):
+    """Reschedule an appointment (stub)."""
+    # Merge sources – JSON body takes precedence if present
+    if body:
+        patient_id = body.get("patient_id", patient_id)
+        old_time = body.get("old_time", old_time_q)
+        new_start = body.get("new_start", new_start_q)
+    else:
+        old_time = old_time_q
+        new_start = new_start_q
+
+    if not patient_id or not old_time or not new_start:
+        raise HTTPException(status_code=422, detail="patient_id, old_time, new_start required")
+
+    if os.getenv("OFFLINE_MODE", "0") == "1":
+        return RescheduleResponse(new_time=new_start)
+    raise HTTPException(status_code=501, detail="Live reschedule not implemented")
+
+@app.post("/handoff", dependencies=[Depends(verify_retell)], status_code=204)
+async def handoff():
+    """Notify backend of human handoff."""
+    return None
 
 # Read-only endpoints 
 
